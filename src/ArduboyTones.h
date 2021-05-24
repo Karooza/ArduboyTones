@@ -86,7 +86,7 @@ THE SOFTWARE.
 
 // ************************************************************
 
-
+#ifndef ARDUBOY4809
 #ifndef AB_DEVKIT
   // ***** SPEAKER ON TWO PINS *****
   // Indicates that each of the speaker leads is attached to a pin, the way
@@ -109,6 +109,7 @@ THE SOFTWARE.
     // Must be defined for volume control, so force it if necessary.
     #define TONES_2_SPEAKER_PINS
   #endif
+#endif
 #endif
 
 // ***** CONTROL THE TIMER CLOCK PRESCALER ****
@@ -135,6 +136,15 @@ THE SOFTWARE.
 #define TONE_PIN2_DDR DDRB
 #define TONE_PIN2 PORTB3
 #define TONE_PIN2_MASK _BV(TONE_PIN2)
+#elif ARDUBOY4809
+#define TONE_PIN_PORT PORTB_OUT
+#define TONE_PIN_DDR PORTB_DIR
+#define TONE_PIN PIN0_bp
+#define TONE_PIN_MASK PIN0_bm
+#define TONE_PIN2_PORT PORTB_OUT
+#define TONE_PIN2_DDR PORTB_DIR
+#define TONE_PIN2 PIN1_bp
+#define TONE_PIN2_MASK PIN1_bm
 #else
 #ifndef AB_DEVKIT
   // Arduboy speaker pin 1 = Arduino pin 5 = ATmega32u4 PC6

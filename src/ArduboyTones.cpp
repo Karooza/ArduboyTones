@@ -77,6 +77,8 @@ void ArduboyTones::tone(uint16_t freq, uint16_t dur)
 {
 #ifdef SLIMBOY
   bitWrite(TIMSK1, OCIE1A, 0); // disable the output compare match interrupt
+#elif ARDUBOY4809
+  TCB0.INTCTRL = 0;            // Disable compare interrupt
 #else
   bitWrite(TIMSK3, OCIE3A, 0); // disable the output compare match interrupt
 #endif
@@ -93,6 +95,8 @@ void ArduboyTones::tone(uint16_t freq1, uint16_t dur1,
 {
 #ifdef SLIMBOY
   bitWrite(TIMSK1, OCIE1A, 0); // disable the output compare match interrupt
+#elif ARDUBOY4809
+  TCB0.INTCTRL = 0;            // Disable compare interrupt
 #else
   bitWrite(TIMSK3, OCIE3A, 0); // disable the output compare match interrupt
 #endif
@@ -112,6 +116,8 @@ void ArduboyTones::tone(uint16_t freq1, uint16_t dur1,
 {
 #ifdef SLIMBOY
   bitWrite(TIMSK1, OCIE1A, 0); // disable the output compare match interrupt
+#elif ARDUBOY4809
+  TCB0.INTCTRL = 0;            // Disable compare interrupt
 #else
   bitWrite(TIMSK3, OCIE3A, 0); // disable the output compare match interrupt
 #endif
@@ -131,6 +137,8 @@ void ArduboyTones::tones(const uint16_t *tones)
 {
 #ifdef SLIMBOY
   bitWrite(TIMSK1, OCIE1A, 0); // disable the output compare match interrupt
+#elif ARDUBOY4809
+  TCB0.INTCTRL = 0;            // Disable compare interrupt
 #else
   bitWrite(TIMSK3, OCIE3A, 0); // disable the output compare match interrupt
 #endif
@@ -143,6 +151,8 @@ void ArduboyTones::tonesInRAM(uint16_t *tones)
 {
 #ifdef SLIMBOY
   bitWrite(TIMSK1, OCIE1A, 0); // disable the output compare match interrupt
+#elif ARDUBOY4809
+  TCB0.INTCTRL = 0;            // Disable compare interrupt
 #else
   bitWrite(TIMSK3, OCIE3A, 0); // disable the output compare match interrupt
 #endif
@@ -156,6 +166,9 @@ void ArduboyTones::noTone()
 #ifdef SLIMBOY
   bitWrite(TIMSK1, OCIE1A, 0); // disable the output compare match interrupt
   TCCR1B = 0; // stop the counter
+#elif ARDUBOY4809
+  TCB0.INTCTRL = 0;            // Disable compare interrupt
+  TCB0.CCMP = 0;
 #else
   bitWrite(TIMSK3, OCIE3A, 0); // disable the output compare match interrupt
   TCCR3B = 0; // stop the counter
@@ -227,6 +240,8 @@ void ArduboyTones::nextTone()
   if (freq >= MIN_NO_PRESCALE_FREQ) {
 #ifdef SLIMBOY
     tccrxbValue = _BV(WGM12) | _BV(CS10); // CTC mode, no prescaling
+#elif ARDUBOY4809
+    tccrxbValue = TCB_CLKSEL_CLKDIV1_gc | TCB_ENABLE_bm;  // No prescaler
 #else
     tccrxbValue = _BV(WGM32) | _BV(CS30); // CTC mode, no prescaling
 #endif
@@ -236,18 +251,33 @@ void ArduboyTones::nextTone()
   else {
 #ifdef SLIMBOY
     tccrxbValue = _BV(WGM12) | _BV(CS11); // CTC mode, prescaler /8
+#elif ARDUBOY4809
+    // Maximum prescaler on Timer B0 is divide by 2
+    tccrxbValue = TCB_CLKSEL_CLKDIV2_gc | TCB_ENABLE_bm;
 #else
     tccrxbValue = _BV(WGM32) | _BV(CS31); // CTC mode, prescaler /8
 #endif
 #endif
-    if (freq == 0) { // if tone is silent
+    if (freq == 0) 
+    { // if tone is silent
+#ifdef ARDUBOY4809
+      // Using a divide by 2 prescaler on Timer B0
+      ocrValue = F_CPU / 2 / SILENT_FREQ / 2 - 1; // dummy tone for silence
+#else  
       ocrValue = F_CPU / 8 / SILENT_FREQ / 2 - 1; // dummy tone for silence
+#endif      
       freq = SILENT_FREQ;
       toneSilent = true;
       bitClear(TONE_PIN_PORT, TONE_PIN); // set the pin low
     }
-    else {
+    else 
+    {
+#ifdef ARDUBOY4809
+      // Using a divide by 2 prescaler on Timer B0
+      ocrValue = F_CPU / 2 / freq / 2 - 1;
+#else
       ocrValue = F_CPU / 8 / freq / 2 - 1;
+#endif
       toneSilent = false;
     }
 #ifdef TONES_ADJUST_PRESCALER
@@ -294,6 +324,18 @@ void ArduboyTones::nextTone()
   OCR1A = ocrValue;
   durationToggleCount = toggleCount;
   bitWrite(TIMSK1, OCIE1A, 1); // enable the output compare match interrupt
+#elif ARDUBOY4809
+#ifdef TONES_ADJUST_PRESCALER
+  // Use no prescaler 
+  TCB0_CTRLA = tccrxbValue;
+#else
+  // Use divide by 2 prescaler
+  TCB0_CTRLA = TCB_CLKSEL_CLKDIV2_gc | TCB_ENABLE_bm; 
+#endif
+  TCB0.CTRLB = TCB_CNTMODE_INT_gc;    // Periodic mode
+  TCB0.CCMP = ocrValue;               // Load Capture Compare register         
+  durationToggleCount = toggleCount;
+  TCB0_INTCTRL = TCB_CAPT_bm;         // Enable interrupt
 #else
   TCCR3A = 0;
 #ifdef TONES_ADJUST_PRESCALER
@@ -317,10 +359,16 @@ uint16_t ArduboyTones::getNext()
 
 #ifdef SLIMBOY
 ISR(TIMER1_COMPA_vect)
+#elif ARDUBOY4809
+ISR(TCB0_INT_vect)
 #else
 ISR(TIMER3_COMPA_vect)
 #endif
 {
+#ifdef ARDUBOY4809
+  // Clear interrupt flag
+  TCB0_INTFLAGS = TCB_CAPT_bm;
+#endif
   if (durationToggleCount != 0) {
     if (!toneSilent) {
       *(&TONE_PIN_PORT) ^= TONE_PIN_MASK; // toggle the pin

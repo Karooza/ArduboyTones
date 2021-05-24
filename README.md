@@ -1,3 +1,7 @@
+# ARDUBOY4809 - ArduboyTones port
+
+This is a port of the SLIMBOY version of ArduboyTones intended to be used with ARDUBOY4809.
+
 # SLIMBOY - ArduboyTones port to Arduino Nano
 
 This is a port of the original ArduboyTones code to the simpler and cheaper
